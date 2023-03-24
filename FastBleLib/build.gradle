@@ -14,7 +14,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    namespace 'com.clj.fastble'
+    namespace 'com.aibots.fastble'
 }
 
 dependencies {
