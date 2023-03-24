@@ -8,6 +8,17 @@ import android.os.Parcelable;
 
 public class BleDevice implements Parcelable {
 
+    public static final Creator<BleDevice> CREATOR = new Creator<BleDevice>() {
+        @Override
+        public BleDevice createFromParcel(Parcel in) {
+            return new BleDevice(in);
+        }
+
+        @Override
+        public BleDevice[] newArray(int size) {
+            return new BleDevice[size];
+        }
+    };
     private BluetoothDevice mDevice;
     private byte[] mScanRecord;
     private int mRssi;
@@ -43,18 +54,6 @@ public class BleDevice implements Parcelable {
     public int describeContents() {
         return 0;
     }
-
-    public static final Creator<BleDevice> CREATOR = new Creator<BleDevice>() {
-        @Override
-        public BleDevice createFromParcel(Parcel in) {
-            return new BleDevice(in);
-        }
-
-        @Override
-        public BleDevice[] newArray(int size) {
-            return new BleDevice[size];
-        }
-    };
 
     public String getName() {
         if (mDevice != null) {

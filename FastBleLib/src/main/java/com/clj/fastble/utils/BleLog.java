@@ -5,8 +5,8 @@ import android.util.Log;
 
 public final class BleLog {
 
-    public static boolean isPrint = true;
     private static final String defaultTag = "FastBle";
+    public static boolean isPrint = true;
 
     public static void d(String msg) {
         if (isPrint && msg != null)

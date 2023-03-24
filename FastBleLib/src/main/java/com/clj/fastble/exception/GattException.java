@@ -22,7 +22,7 @@ public class GattException extends BleException {
     @Override
     public String toString() {
         return "GattException{" +
-               "gattStatus=" + gattStatus +
-               "} " + super.toString();
+                "gattStatus=" + gattStatus +
+                "} " + super.toString();
     }
 }

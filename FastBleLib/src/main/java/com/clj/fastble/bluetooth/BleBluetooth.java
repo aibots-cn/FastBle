@@ -1,5 +1,7 @@
 package com.clj.fastble.bluetooth;
 
+import static android.bluetooth.BluetoothDevice.TRANSPORT_LE;
+
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -33,328 +35,22 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import static android.bluetooth.BluetoothDevice.TRANSPORT_LE;
-
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class BleBluetooth {
 
-    private BleGattCallback bleGattCallback;
-    private BleRssiCallback bleRssiCallback;
-    private BleMtuChangedCallback bleMtuChangedCallback;
     private final HashMap<String, BleNotifyCallback> bleNotifyCallbackHashMap = new HashMap<>();
     private final HashMap<String, BleIndicateCallback> bleIndicateCallbackHashMap = new HashMap<>();
     private final HashMap<String, BleWriteCallback> bleWriteCallbackHashMap = new HashMap<>();
     private final HashMap<String, BleReadCallback> bleReadCallbackHashMap = new HashMap<>();
-
+    private final BleDevice bleDevice;
+    private final MainHandler mainHandler = new MainHandler(Looper.getMainLooper());
+    private BleGattCallback bleGattCallback;
+    private BleRssiCallback bleRssiCallback;
+    private BleMtuChangedCallback bleMtuChangedCallback;
     private LastState lastState;
     private boolean isActiveDisconnect = false;
-    private final BleDevice bleDevice;
     private BluetoothGatt bluetoothGatt;
-    private final MainHandler mainHandler = new MainHandler(Looper.getMainLooper());
     private int connectRetryCount = 0;
-
-    public BleBluetooth(BleDevice bleDevice) {
-        this.bleDevice = bleDevice;
-    }
-
-    public BleConnector newBleConnector() {
-        return new BleConnector(this);
-    }
-
-    public synchronized void addConnectGattCallback(BleGattCallback callback) {
-        bleGattCallback = callback;
-    }
-
-    public synchronized void removeConnectGattCallback() {
-        bleGattCallback = null;
-    }
-
-    public synchronized void addNotifyCallback(String uuid, BleNotifyCallback bleNotifyCallback) {
-        bleNotifyCallbackHashMap.put(uuid, bleNotifyCallback);
-    }
-
-    public synchronized void addIndicateCallback(String uuid, BleIndicateCallback bleIndicateCallback) {
-        bleIndicateCallbackHashMap.put(uuid, bleIndicateCallback);
-    }
-
-    public synchronized void addWriteCallback(String uuid, BleWriteCallback bleWriteCallback) {
-        bleWriteCallbackHashMap.put(uuid, bleWriteCallback);
-    }
-
-    public synchronized void addReadCallback(String uuid, BleReadCallback bleReadCallback) {
-        bleReadCallbackHashMap.put(uuid, bleReadCallback);
-    }
-
-    public synchronized void removeNotifyCallback(String uuid) {
-        if (bleNotifyCallbackHashMap.containsKey(uuid))
-            bleNotifyCallbackHashMap.remove(uuid);
-    }
-
-    public synchronized void removeIndicateCallback(String uuid) {
-        if (bleIndicateCallbackHashMap.containsKey(uuid))
-            bleIndicateCallbackHashMap.remove(uuid);
-    }
-
-    public synchronized void removeWriteCallback(String uuid) {
-        if (bleWriteCallbackHashMap.containsKey(uuid))
-            bleWriteCallbackHashMap.remove(uuid);
-    }
-
-    public synchronized void removeReadCallback(String uuid) {
-        if (bleReadCallbackHashMap.containsKey(uuid))
-            bleReadCallbackHashMap.remove(uuid);
-    }
-
-    public synchronized void clearCharacterCallback() {
-        bleNotifyCallbackHashMap.clear();
-        bleIndicateCallbackHashMap.clear();
-        bleWriteCallbackHashMap.clear();
-        bleReadCallbackHashMap.clear();
-    }
-
-    public synchronized void addRssiCallback(BleRssiCallback callback) {
-        bleRssiCallback = callback;
-    }
-
-    public synchronized void removeRssiCallback() {
-        bleRssiCallback = null;
-    }
-
-    public synchronized void addMtuChangedCallback(BleMtuChangedCallback callback) {
-        bleMtuChangedCallback = callback;
-    }
-
-    public synchronized void removeMtuChangedCallback() {
-        bleMtuChangedCallback = null;
-    }
-
-
-    public String getDeviceKey() {
-        return bleDevice.getKey();
-    }
-
-    public BleDevice getDevice() {
-        return bleDevice;
-    }
-
-    public BluetoothGatt getBluetoothGatt() {
-        return bluetoothGatt;
-    }
-
-    public synchronized BluetoothGatt connect(BleDevice bleDevice,
-                                              boolean autoConnect,
-                                              BleGattCallback callback) {
-        return connect(bleDevice, autoConnect, callback, 0);
-    }
-
-    public synchronized BluetoothGatt connect(BleDevice bleDevice,
-                                              boolean autoConnect,
-                                              BleGattCallback callback,
-                                              int connectRetryCount) {
-        BleLog.i("connect device: " + bleDevice.getName()
-                + "\nmac: " + bleDevice.getMac()
-                + "\nautoConnect: " + autoConnect
-                + "\ncurrentThread: " + Thread.currentThread().getId()
-                + "\nconnectCount:" + (connectRetryCount + 1));
-        if (connectRetryCount == 0) {
-            this.connectRetryCount = 0;
-        }
-
-        addConnectGattCallback(callback);
-
-        lastState = LastState.CONNECT_CONNECTING;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            bluetoothGatt = bleDevice.getDevice().connectGatt(BleManager.getInstance().getContext(),
-                    autoConnect, coreGattCallback, TRANSPORT_LE);
-        } else {
-            bluetoothGatt = bleDevice.getDevice().connectGatt(BleManager.getInstance().getContext(),
-                    autoConnect, coreGattCallback);
-        }
-        if (bluetoothGatt != null) {
-            if (bleGattCallback != null) {
-                bleGattCallback.onStartConnect();
-            }
-            Message message = mainHandler.obtainMessage();
-            message.what = BleMsg.MSG_CONNECT_OVER_TIME;
-            mainHandler.sendMessageDelayed(message, BleManager.getInstance().getConnectOverTime());
-
-        } else {
-            disconnectGatt();
-            refreshDeviceCache();
-            closeBluetoothGatt();
-            lastState = LastState.CONNECT_FAILURE;
-            BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
-            if (bleGattCallback != null)
-                bleGattCallback.onConnectFail(bleDevice, new OtherException("GATT connect exception occurred!"));
-
-        }
-        return bluetoothGatt;
-    }
-
-    public synchronized void disconnect() {
-        isActiveDisconnect = true;
-        disconnectGatt();
-    }
-
-    public synchronized void destroy() {
-        lastState = LastState.CONNECT_IDLE;
-        disconnectGatt();
-        refreshDeviceCache();
-        closeBluetoothGatt();
-        removeConnectGattCallback();
-        removeRssiCallback();
-        removeMtuChangedCallback();
-        clearCharacterCallback();
-        mainHandler.removeCallbacksAndMessages(null);
-    }
-
-    private synchronized void disconnectGatt() {
-        if (bluetoothGatt != null) {
-            bluetoothGatt.disconnect();
-        }
-    }
-
-    private synchronized void refreshDeviceCache() {
-        try {
-            final Method refresh = BluetoothGatt.class.getMethod("refresh");
-            if (refresh != null && bluetoothGatt != null) {
-                boolean success = (Boolean) refresh.invoke(bluetoothGatt);
-                BleLog.i("refreshDeviceCache, is success:  " + success);
-            }
-        } catch (Exception e) {
-            BleLog.i("exception occur while refreshing device: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    private synchronized void closeBluetoothGatt() {
-        if (bluetoothGatt != null) {
-            bluetoothGatt.close();
-        }
-    }
-
-    private final class MainHandler extends Handler {
-
-        MainHandler(Looper looper) {
-            super(looper);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case BleMsg.MSG_CONNECT_FAIL: {
-                    disconnectGatt();
-                    refreshDeviceCache();
-                    closeBluetoothGatt();
-
-                    if (connectRetryCount < BleManager.getInstance().getReConnectCount()) {
-                        BleLog.e("Connect fail, try reconnect " + BleManager.getInstance().getReConnectInterval() + " millisecond later");
-                        ++connectRetryCount;
-
-                        Message message = mainHandler.obtainMessage();
-                        message.what = BleMsg.MSG_RECONNECT;
-                        mainHandler.sendMessageDelayed(message, BleManager.getInstance().getReConnectInterval());
-                    } else {
-                        lastState = LastState.CONNECT_FAILURE;
-                        BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
-
-                        BleConnectStateParameter para = (BleConnectStateParameter) msg.obj;
-                        int status = para.getStatus();
-                        if (bleGattCallback != null)
-                            bleGattCallback.onConnectFail(bleDevice, new ConnectException(bluetoothGatt, status));
-                    }
-                }
-                break;
-
-                case BleMsg.MSG_DISCONNECTED: {
-                    lastState = LastState.CONNECT_DISCONNECT;
-                    BleManager.getInstance().getMultipleBluetoothController().removeBleBluetooth(BleBluetooth.this);
-
-                    disconnect();
-                    refreshDeviceCache();
-                    closeBluetoothGatt();
-                    removeRssiCallback();
-                    removeMtuChangedCallback();
-                    clearCharacterCallback();
-                    mainHandler.removeCallbacksAndMessages(null);
-
-                    BleConnectStateParameter para = (BleConnectStateParameter) msg.obj;
-                    boolean isActive = para.isActive();
-                    int status = para.getStatus();
-                    if (bleGattCallback != null)
-                        bleGattCallback.onDisConnected(isActive, bleDevice, bluetoothGatt, status);
-                }
-                break;
-
-                case BleMsg.MSG_RECONNECT: {
-                    connect(bleDevice, false, bleGattCallback, connectRetryCount);
-                }
-                break;
-
-                case BleMsg.MSG_CONNECT_OVER_TIME: {
-                    disconnectGatt();
-                    refreshDeviceCache();
-                    closeBluetoothGatt();
-
-                    lastState = LastState.CONNECT_FAILURE;
-                    BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
-
-                    if (bleGattCallback != null)
-                        bleGattCallback.onConnectFail(bleDevice, new TimeoutException());
-                }
-                break;
-
-                case BleMsg.MSG_DISCOVER_SERVICES: {
-                    if (bluetoothGatt != null) {
-                        boolean discoverServiceResult = bluetoothGatt.discoverServices();
-                        if (!discoverServiceResult) {
-                            Message message = mainHandler.obtainMessage();
-                            message.what = BleMsg.MSG_DISCOVER_FAIL;
-                            mainHandler.sendMessage(message);
-                        }
-                    } else {
-                        Message message = mainHandler.obtainMessage();
-                        message.what = BleMsg.MSG_DISCOVER_FAIL;
-                        mainHandler.sendMessage(message);
-                    }
-                }
-                break;
-
-                case BleMsg.MSG_DISCOVER_FAIL: {
-                    disconnectGatt();
-                    refreshDeviceCache();
-                    closeBluetoothGatt();
-
-                    lastState = LastState.CONNECT_FAILURE;
-                    BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
-
-                    if (bleGattCallback != null)
-                        bleGattCallback.onConnectFail(bleDevice,
-                                new OtherException("GATT discover services exception occurred!"));
-                }
-                break;
-
-                case BleMsg.MSG_DISCOVER_SUCCESS: {
-                    lastState = LastState.CONNECT_CONNECTED;
-                    isActiveDisconnect = false;
-                    BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
-                    BleManager.getInstance().getMultipleBluetoothController().addBleBluetooth(BleBluetooth.this);
-
-                    BleConnectStateParameter para = (BleConnectStateParameter) msg.obj;
-                    int status = para.getStatus();
-                    if (bleGattCallback != null)
-                        bleGattCallback.onConnectSuccess(bleDevice, bluetoothGatt, status);
-                }
-                break;
-
-                default:
-                    super.handleMessage(msg);
-                    break;
-            }
-        }
-    }
-
     private BluetoothGattCallback coreGattCallback = new BluetoothGattCallback() {
 
         @Override
@@ -601,12 +297,313 @@ public class BleBluetooth {
         }
     };
 
+    public BleBluetooth(BleDevice bleDevice) {
+        this.bleDevice = bleDevice;
+    }
+
+    public BleConnector newBleConnector() {
+        return new BleConnector(this);
+    }
+
+    public synchronized void addConnectGattCallback(BleGattCallback callback) {
+        bleGattCallback = callback;
+    }
+
+    public synchronized void removeConnectGattCallback() {
+        bleGattCallback = null;
+    }
+
+    public synchronized void addNotifyCallback(String uuid, BleNotifyCallback bleNotifyCallback) {
+        bleNotifyCallbackHashMap.put(uuid, bleNotifyCallback);
+    }
+
+    public synchronized void addIndicateCallback(String uuid, BleIndicateCallback bleIndicateCallback) {
+        bleIndicateCallbackHashMap.put(uuid, bleIndicateCallback);
+    }
+
+    public synchronized void addWriteCallback(String uuid, BleWriteCallback bleWriteCallback) {
+        bleWriteCallbackHashMap.put(uuid, bleWriteCallback);
+    }
+
+    public synchronized void addReadCallback(String uuid, BleReadCallback bleReadCallback) {
+        bleReadCallbackHashMap.put(uuid, bleReadCallback);
+    }
+
+    public synchronized void removeNotifyCallback(String uuid) {
+        if (bleNotifyCallbackHashMap.containsKey(uuid))
+            bleNotifyCallbackHashMap.remove(uuid);
+    }
+
+    public synchronized void removeIndicateCallback(String uuid) {
+        if (bleIndicateCallbackHashMap.containsKey(uuid))
+            bleIndicateCallbackHashMap.remove(uuid);
+    }
+
+    public synchronized void removeWriteCallback(String uuid) {
+        if (bleWriteCallbackHashMap.containsKey(uuid))
+            bleWriteCallbackHashMap.remove(uuid);
+    }
+
+    public synchronized void removeReadCallback(String uuid) {
+        if (bleReadCallbackHashMap.containsKey(uuid))
+            bleReadCallbackHashMap.remove(uuid);
+    }
+
+    public synchronized void clearCharacterCallback() {
+        bleNotifyCallbackHashMap.clear();
+        bleIndicateCallbackHashMap.clear();
+        bleWriteCallbackHashMap.clear();
+        bleReadCallbackHashMap.clear();
+    }
+
+    public synchronized void addRssiCallback(BleRssiCallback callback) {
+        bleRssiCallback = callback;
+    }
+
+    public synchronized void removeRssiCallback() {
+        bleRssiCallback = null;
+    }
+
+    public synchronized void addMtuChangedCallback(BleMtuChangedCallback callback) {
+        bleMtuChangedCallback = callback;
+    }
+
+    public synchronized void removeMtuChangedCallback() {
+        bleMtuChangedCallback = null;
+    }
+
+    public String getDeviceKey() {
+        return bleDevice.getKey();
+    }
+
+    public BleDevice getDevice() {
+        return bleDevice;
+    }
+
+    public BluetoothGatt getBluetoothGatt() {
+        return bluetoothGatt;
+    }
+
+    public synchronized BluetoothGatt connect(BleDevice bleDevice,
+                                              boolean autoConnect,
+                                              BleGattCallback callback) {
+        return connect(bleDevice, autoConnect, callback, 0);
+    }
+
+    public synchronized BluetoothGatt connect(BleDevice bleDevice,
+                                              boolean autoConnect,
+                                              BleGattCallback callback,
+                                              int connectRetryCount) {
+        BleLog.i("connect device: " + bleDevice.getName()
+                + "\nmac: " + bleDevice.getMac()
+                + "\nautoConnect: " + autoConnect
+                + "\ncurrentThread: " + Thread.currentThread().getId()
+                + "\nconnectCount:" + (connectRetryCount + 1));
+        if (connectRetryCount == 0) {
+            this.connectRetryCount = 0;
+        }
+
+        addConnectGattCallback(callback);
+
+        lastState = LastState.CONNECT_CONNECTING;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            bluetoothGatt = bleDevice.getDevice().connectGatt(BleManager.getInstance().getContext(),
+                    autoConnect, coreGattCallback, TRANSPORT_LE);
+        } else {
+            bluetoothGatt = bleDevice.getDevice().connectGatt(BleManager.getInstance().getContext(),
+                    autoConnect, coreGattCallback);
+        }
+        if (bluetoothGatt != null) {
+            if (bleGattCallback != null) {
+                bleGattCallback.onStartConnect();
+            }
+            Message message = mainHandler.obtainMessage();
+            message.what = BleMsg.MSG_CONNECT_OVER_TIME;
+            mainHandler.sendMessageDelayed(message, BleManager.getInstance().getConnectOverTime());
+
+        } else {
+            disconnectGatt();
+            refreshDeviceCache();
+            closeBluetoothGatt();
+            lastState = LastState.CONNECT_FAILURE;
+            BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
+            if (bleGattCallback != null)
+                bleGattCallback.onConnectFail(bleDevice, new OtherException("GATT connect exception occurred!"));
+
+        }
+        return bluetoothGatt;
+    }
+
+    public synchronized void disconnect() {
+        isActiveDisconnect = true;
+        disconnectGatt();
+    }
+
+    public synchronized void destroy() {
+        lastState = LastState.CONNECT_IDLE;
+        disconnectGatt();
+        refreshDeviceCache();
+        closeBluetoothGatt();
+        removeConnectGattCallback();
+        removeRssiCallback();
+        removeMtuChangedCallback();
+        clearCharacterCallback();
+        mainHandler.removeCallbacksAndMessages(null);
+    }
+
+    private synchronized void disconnectGatt() {
+        if (bluetoothGatt != null) {
+            bluetoothGatt.disconnect();
+        }
+    }
+
+    private synchronized void refreshDeviceCache() {
+        try {
+            final Method refresh = BluetoothGatt.class.getMethod("refresh");
+            if (refresh != null && bluetoothGatt != null) {
+                boolean success = (Boolean) refresh.invoke(bluetoothGatt);
+                BleLog.i("refreshDeviceCache, is success:  " + success);
+            }
+        } catch (Exception e) {
+            BleLog.i("exception occur while refreshing device: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private synchronized void closeBluetoothGatt() {
+        if (bluetoothGatt != null) {
+            bluetoothGatt.close();
+        }
+    }
+
     enum LastState {
         CONNECT_IDLE,
         CONNECT_CONNECTING,
         CONNECT_CONNECTED,
         CONNECT_FAILURE,
         CONNECT_DISCONNECT
+    }
+
+    private final class MainHandler extends Handler {
+
+        MainHandler(Looper looper) {
+            super(looper);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case BleMsg.MSG_CONNECT_FAIL: {
+                    disconnectGatt();
+                    refreshDeviceCache();
+                    closeBluetoothGatt();
+
+                    if (connectRetryCount < BleManager.getInstance().getReConnectCount()) {
+                        BleLog.e("Connect fail, try reconnect " + BleManager.getInstance().getReConnectInterval() + " millisecond later");
+                        ++connectRetryCount;
+
+                        Message message = mainHandler.obtainMessage();
+                        message.what = BleMsg.MSG_RECONNECT;
+                        mainHandler.sendMessageDelayed(message, BleManager.getInstance().getReConnectInterval());
+                    } else {
+                        lastState = LastState.CONNECT_FAILURE;
+                        BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
+
+                        BleConnectStateParameter para = (BleConnectStateParameter) msg.obj;
+                        int status = para.getStatus();
+                        if (bleGattCallback != null)
+                            bleGattCallback.onConnectFail(bleDevice, new ConnectException(bluetoothGatt, status));
+                    }
+                }
+                break;
+
+                case BleMsg.MSG_DISCONNECTED: {
+                    lastState = LastState.CONNECT_DISCONNECT;
+                    BleManager.getInstance().getMultipleBluetoothController().removeBleBluetooth(BleBluetooth.this);
+
+                    disconnect();
+                    refreshDeviceCache();
+                    closeBluetoothGatt();
+                    removeRssiCallback();
+                    removeMtuChangedCallback();
+                    clearCharacterCallback();
+                    mainHandler.removeCallbacksAndMessages(null);
+
+                    BleConnectStateParameter para = (BleConnectStateParameter) msg.obj;
+                    boolean isActive = para.isActive();
+                    int status = para.getStatus();
+                    if (bleGattCallback != null)
+                        bleGattCallback.onDisConnected(isActive, bleDevice, bluetoothGatt, status);
+                }
+                break;
+
+                case BleMsg.MSG_RECONNECT: {
+                    connect(bleDevice, false, bleGattCallback, connectRetryCount);
+                }
+                break;
+
+                case BleMsg.MSG_CONNECT_OVER_TIME: {
+                    disconnectGatt();
+                    refreshDeviceCache();
+                    closeBluetoothGatt();
+
+                    lastState = LastState.CONNECT_FAILURE;
+                    BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
+
+                    if (bleGattCallback != null)
+                        bleGattCallback.onConnectFail(bleDevice, new TimeoutException());
+                }
+                break;
+
+                case BleMsg.MSG_DISCOVER_SERVICES: {
+                    if (bluetoothGatt != null) {
+                        boolean discoverServiceResult = bluetoothGatt.discoverServices();
+                        if (!discoverServiceResult) {
+                            Message message = mainHandler.obtainMessage();
+                            message.what = BleMsg.MSG_DISCOVER_FAIL;
+                            mainHandler.sendMessage(message);
+                        }
+                    } else {
+                        Message message = mainHandler.obtainMessage();
+                        message.what = BleMsg.MSG_DISCOVER_FAIL;
+                        mainHandler.sendMessage(message);
+                    }
+                }
+                break;
+
+                case BleMsg.MSG_DISCOVER_FAIL: {
+                    disconnectGatt();
+                    refreshDeviceCache();
+                    closeBluetoothGatt();
+
+                    lastState = LastState.CONNECT_FAILURE;
+                    BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
+
+                    if (bleGattCallback != null)
+                        bleGattCallback.onConnectFail(bleDevice,
+                                new OtherException("GATT discover services exception occurred!"));
+                }
+                break;
+
+                case BleMsg.MSG_DISCOVER_SUCCESS: {
+                    lastState = LastState.CONNECT_CONNECTED;
+                    isActiveDisconnect = false;
+                    BleManager.getInstance().getMultipleBluetoothController().removeConnectingBle(BleBluetooth.this);
+                    BleManager.getInstance().getMultipleBluetoothController().addBleBluetooth(BleBluetooth.this);
+
+                    BleConnectStateParameter para = (BleConnectStateParameter) msg.obj;
+                    int status = para.getStatus();
+                    if (bleGattCallback != null)
+                        bleGattCallback.onConnectSuccess(bleDevice, bluetoothGatt, status);
+                }
+                break;
+
+                default:
+                    super.handleMessage(msg);
+                    break;
+            }
+        }
     }
 
 }

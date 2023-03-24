@@ -25,42 +25,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public abstract class BleScanPresenter implements BluetoothAdapter.LeScanCallback {
 
+    private final List<BleDevice> mBleDeviceList = new ArrayList<>();
+    private final Handler mMainHandler = new Handler(Looper.getMainLooper());
     private String[] mDeviceNames;
     private String mDeviceMac;
     private boolean mFuzzy;
     private boolean mNeedConnect;
     private long mScanTimeout;
     private BleScanPresenterImp mBleScanPresenterImp;
-
-    private final List<BleDevice> mBleDeviceList = new ArrayList<>();
-
-    private final Handler mMainHandler = new Handler(Looper.getMainLooper());
     private HandlerThread mHandlerThread;
     private Handler mHandler;
     private boolean mHandling;
-
-    private static final class ScanHandler extends Handler {
-
-        private final WeakReference<BleScanPresenter> mBleScanPresenter;
-
-        ScanHandler(Looper looper, BleScanPresenter bleScanPresenter) {
-            super(looper);
-            mBleScanPresenter = new WeakReference<>(bleScanPresenter);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            BleScanPresenter bleScanPresenter = mBleScanPresenter.get();
-            if (bleScanPresenter != null) {
-                if (msg.what == BleMsg.MSG_SCAN_DEVICE) {
-                    final BleDevice bleDevice = (BleDevice) msg.obj;
-                    if (bleDevice != null) {
-                        bleScanPresenter.handleResult(bleDevice);
-                    }
-                }
-            }
-        }
-    }
 
     private void handleResult(final BleDevice bleDevice) {
         mMainHandler.post(new Runnable() {
@@ -137,7 +112,6 @@ public abstract class BleScanPresenter implements BluetoothAdapter.LeScanCallbac
 
         correctDeviceAndNextStep(bleDevice);
     }
-
 
     private void correctDeviceAndNextStep(final BleDevice bleDevice) {
         if (mNeedConnect) {
@@ -226,4 +200,27 @@ public abstract class BleScanPresenter implements BluetoothAdapter.LeScanCallbac
     public abstract void onScanning(BleDevice bleDevice);
 
     public abstract void onScanFinished(List<BleDevice> bleDeviceList);
+
+    private static final class ScanHandler extends Handler {
+
+        private final WeakReference<BleScanPresenter> mBleScanPresenter;
+
+        ScanHandler(Looper looper, BleScanPresenter bleScanPresenter) {
+            super(looper);
+            mBleScanPresenter = new WeakReference<>(bleScanPresenter);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            BleScanPresenter bleScanPresenter = mBleScanPresenter.get();
+            if (bleScanPresenter != null) {
+                if (msg.what == BleMsg.MSG_SCAN_DEVICE) {
+                    final BleDevice bleDevice = (BleDevice) msg.obj;
+                    if (bleDevice != null) {
+                        bleScanPresenter.handleResult(bleDevice);
+                    }
+                }
+            }
+        }
+    }
 }

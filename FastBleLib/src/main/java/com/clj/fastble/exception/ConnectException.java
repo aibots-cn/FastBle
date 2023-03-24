@@ -35,8 +35,8 @@ public class ConnectException extends BleException {
     @Override
     public String toString() {
         return "ConnectException{" +
-               "gattStatus=" + gattStatus +
-               ", bluetoothGatt=" + bluetoothGatt +
-               "} " + super.toString();
+                "gattStatus=" + gattStatus +
+                ", bluetoothGatt=" + bluetoothGatt +
+                "} " + super.toString();
     }
 }

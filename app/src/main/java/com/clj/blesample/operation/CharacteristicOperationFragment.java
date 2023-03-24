@@ -37,9 +37,8 @@ public class CharacteristicOperationFragment extends Fragment {
     public static final int PROPERTY_WRITE_NO_RESPONSE = 3;
     public static final int PROPERTY_NOTIFY = 4;
     public static final int PROPERTY_INDICATE = 5;
-
-    private LinearLayout layout_container;
     private final List<String> childList = new ArrayList<>();
+    private LinearLayout layout_container;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {

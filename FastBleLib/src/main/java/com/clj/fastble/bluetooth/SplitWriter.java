@@ -46,6 +46,35 @@ public class SplitWriter {
         };
     }
 
+    private static Queue<byte[]> splitByte(byte[] data, int count) {
+        if (count > 20) {
+            BleLog.w("Be careful: split count beyond 20! Ensure MTU higher than 23!");
+        }
+        Queue<byte[]> byteQueue = new LinkedList<>();
+        int pkgCount;
+        if (data.length % count == 0) {
+            pkgCount = data.length / count;
+        } else {
+            pkgCount = Math.round(data.length / count + 1);
+        }
+
+        if (pkgCount > 0) {
+            for (int i = 0; i < pkgCount; i++) {
+                byte[] dataPkg;
+                int j;
+                if (pkgCount == 1 || i == pkgCount - 1) {
+                    j = data.length % count == 0 ? count : data.length % count;
+                    System.arraycopy(data, i * count, dataPkg = new byte[j], 0, j);
+                } else {
+                    System.arraycopy(data, i * count, dataPkg = new byte[count], 0, count);
+                }
+                byteQueue.offer(dataPkg);
+            }
+        }
+
+        return byteQueue;
+    }
+
     public void splitWrite(BleBluetooth bleBluetooth,
                            String uuid_service,
                            String uuid_write,
@@ -123,35 +152,6 @@ public class SplitWriter {
     private void release() {
         mHandlerThread.quit();
         mHandler.removeCallbacksAndMessages(null);
-    }
-
-    private static Queue<byte[]> splitByte(byte[] data, int count) {
-        if (count > 20) {
-            BleLog.w("Be careful: split count beyond 20! Ensure MTU higher than 23!");
-        }
-        Queue<byte[]> byteQueue = new LinkedList<>();
-        int pkgCount;
-        if (data.length % count == 0) {
-            pkgCount = data.length / count;
-        } else {
-            pkgCount = Math.round(data.length / count + 1);
-        }
-
-        if (pkgCount > 0) {
-            for (int i = 0; i < pkgCount; i++) {
-                byte[] dataPkg;
-                int j;
-                if (pkgCount == 1 || i == pkgCount - 1) {
-                    j = data.length % count == 0 ? count : data.length % count;
-                    System.arraycopy(data, i * count, dataPkg = new byte[j], 0, j);
-                } else {
-                    System.arraycopy(data, i * count, dataPkg = new byte[count], 0, count);
-                }
-                byteQueue.offer(dataPkg);
-            }
-        }
-
-        return byteQueue;
     }
 
 

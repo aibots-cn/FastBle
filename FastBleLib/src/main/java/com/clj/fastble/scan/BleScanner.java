@@ -20,15 +20,23 @@ import java.util.UUID;
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class BleScanner {
 
+    private BleScanState mBleScanState = BleScanState.STATE_IDLE;
+
     public static BleScanner getInstance() {
         return BleScannerHolder.sBleScanner;
     }
 
-    private static class BleScannerHolder {
-        private static final BleScanner sBleScanner = new BleScanner();
+    public void scan(UUID[] serviceUuids, String[] names, String mac, boolean fuzzy,
+                     long timeOut, final BleScanCallback callback) {
+
+        startLeScan(serviceUuids, names, mac, fuzzy, false, timeOut, callback);
     }
 
-    private BleScanState mBleScanState = BleScanState.STATE_IDLE;
+    public void scanAndConnect(UUID[] serviceUuids, String[] names, String mac, boolean fuzzy,
+                               long timeOut, BleScanAndConnectCallback callback) {
+
+        startLeScan(serviceUuids, names, mac, fuzzy, true, timeOut, callback);
+    }
 
     private final BleScanPresenter mBleScanPresenter = new BleScanPresenter() {
 
@@ -94,18 +102,6 @@ public class BleScanner {
         }
     };
 
-    public void scan(UUID[] serviceUuids, String[] names, String mac, boolean fuzzy,
-                     long timeOut, final BleScanCallback callback) {
-
-        startLeScan(serviceUuids, names, mac, fuzzy, false, timeOut, callback);
-    }
-
-    public void scanAndConnect(UUID[] serviceUuids, String[] names, String mac, boolean fuzzy,
-                               long timeOut, BleScanAndConnectCallback callback) {
-
-        startLeScan(serviceUuids, names, mac, fuzzy, true, timeOut, callback);
-    }
-
     private synchronized void startLeScan(UUID[] serviceUuids, String[] names, String mac, boolean fuzzy,
                                           boolean needConnect, long timeOut, BleScanPresenterImp imp) {
 
@@ -133,6 +129,10 @@ public class BleScanner {
 
     public BleScanState getScanState() {
         return mBleScanState;
+    }
+
+    private static class BleScannerHolder {
+        private static final BleScanner sBleScanner = new BleScanner();
     }
 
 

@@ -1,4 +1,3 @@
-
 package com.clj.fastble.bluetooth;
 
 import android.annotation.TargetApi;

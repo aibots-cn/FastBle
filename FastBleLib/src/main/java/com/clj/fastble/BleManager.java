@@ -41,12 +41,6 @@ import java.util.UUID;
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class BleManager {
 
-    private Application context;
-    private BleScanRuleConfig bleScanRuleConfig;
-    private BluetoothAdapter bluetoothAdapter;
-    private MultipleBluetoothController multipleBluetoothController;
-    private BluetoothManager bluetoothManager;
-
     public static final int DEFAULT_SCAN_TIME = 10000;
     private static final int DEFAULT_MAX_MULTIPLE_DEVICE = 7;
     private static final int DEFAULT_OPERATE_TIME = 5000;
@@ -56,7 +50,11 @@ public class BleManager {
     private static final int DEFAULT_MAX_MTU = 512;
     private static final int DEFAULT_WRITE_DATA_SPLIT_COUNT = 20;
     private static final int DEFAULT_CONNECT_OVER_TIME = 10000;
-
+    private Application context;
+    private BleScanRuleConfig bleScanRuleConfig;
+    private BluetoothAdapter bluetoothAdapter;
+    private MultipleBluetoothController multipleBluetoothController;
+    private BluetoothManager bluetoothManager;
     private int maxConnectCount = DEFAULT_MAX_MULTIPLE_DEVICE;
     private int operateTimeout = DEFAULT_OPERATE_TIME;
     private int reConnectCount = DEFAULT_CONNECT_RETRY_COUNT;
@@ -66,10 +64,6 @@ public class BleManager {
 
     public static BleManager getInstance() {
         return BleManagerHolder.sBleManager;
-    }
-
-    private static class BleManagerHolder {
-        private static final BleManager sBleManager = new BleManager();
     }
 
     public void init(Application app) {
@@ -190,15 +184,6 @@ public class BleManager {
     }
 
     /**
-     * Get connect retry interval
-     *
-     * @return
-     */
-    public long getReConnectInterval() {
-        return reConnectInterval;
-    }
-
-    /**
      * Set connect retry count and interval
      *
      * @param count
@@ -206,6 +191,15 @@ public class BleManager {
      */
     public BleManager setReConnectCount(int count) {
         return setReConnectCount(count, DEFAULT_CONNECT_RETRY_INTERVAL);
+    }
+
+    /**
+     * Get connect retry interval
+     *
+     * @return
+     */
+    public long getReConnectInterval() {
+        return reConnectInterval;
     }
 
     /**
@@ -223,7 +217,6 @@ public class BleManager {
         this.reConnectInterval = interval;
         return this;
     }
-
 
     /**
      * Get operate split Write Num
@@ -376,7 +369,6 @@ public class BleManager {
         BleDevice bleDevice = new BleDevice(bluetoothDevice, 0, null, 0);
         return connect(bleDevice, bleGattCallback);
     }
-
 
     /**
      * Cancel scan
@@ -778,7 +770,6 @@ public class BleManager {
         return bluetoothAdapter != null && bluetoothAdapter.isEnabled();
     }
 
-
     public BleDevice convertBleDevice(BluetoothDevice bluetoothDevice) {
         return new BleDevice(bluetoothDevice);
     }
@@ -930,6 +921,10 @@ public class BleManager {
         if (multipleBluetoothController != null) {
             multipleBluetoothController.destroy();
         }
+    }
+
+    private static class BleManagerHolder {
+        private static final BleManager sBleManager = new BleManager();
     }
 
 

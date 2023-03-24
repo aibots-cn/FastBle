@@ -21,6 +21,7 @@ public class DeviceAdapter extends BaseAdapter {
 
     private final Context context;
     private final List<BleDevice> bleDeviceList = new ArrayList<>();
+    private OnDeviceClickListener mListener;
 
     public DeviceAdapter(Context context) {
         this.context = context;
@@ -154,16 +155,8 @@ public class DeviceAdapter extends BaseAdapter {
         return convertView;
     }
 
-    static class ViewHolder {
-        ImageView img_blue;
-        TextView txt_name;
-        TextView txt_mac;
-        TextView txt_rssi;
-        LinearLayout layout_idle;
-        LinearLayout layout_connected;
-        Button btn_disconnect;
-        Button btn_connect;
-        Button btn_detail;
+    public void setOnDeviceClickListener(OnDeviceClickListener listener) {
+        this.mListener = listener;
     }
 
     public interface OnDeviceClickListener {
@@ -174,10 +167,16 @@ public class DeviceAdapter extends BaseAdapter {
         void onDetail(BleDevice bleDevice);
     }
 
-    private OnDeviceClickListener mListener;
-
-    public void setOnDeviceClickListener(OnDeviceClickListener listener) {
-        this.mListener = listener;
+    static class ViewHolder {
+        ImageView img_blue;
+        TextView txt_name;
+        TextView txt_mac;
+        TextView txt_rssi;
+        LinearLayout layout_idle;
+        LinearLayout layout_connected;
+        Button btn_disconnect;
+        Button btn_connect;
+        Button btn_detail;
     }
 
 }

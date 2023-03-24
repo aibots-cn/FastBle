@@ -1,4 +1,3 @@
-
 package com.clj.fastble.callback;
 
 import android.annotation.TargetApi;
